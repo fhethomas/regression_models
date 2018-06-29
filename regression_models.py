@@ -87,9 +87,3 @@ class Linear_regression:
         return np.dot(X,self.theta)
 
 
-
-#test the initial model results by regenerating fake data 
-
-X,y=genXy(cases,input_layer_size)
-t=tester(theta,X,y,input_layer_size,hidden_layer_size,output_layer_size,lamb)
-
