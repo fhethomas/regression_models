@@ -133,3 +133,95 @@ class Linear_regression:
             X=normalize(X)
         X = self.add_intercept(X)
         return np.dot(X,self.theta)
+class Logistic_regression:
+    """Linear regression model
+    Parameters
+    -----------
+    alpha : float, default 0.01
+        learning rate of gradient descent
+    degree_accuracy : float, default 0.05
+        degree of accuracy that linear
+        regression is looking for during 
+        gradient descent
+    feature_scaling : string, default None
+        options: None,'normalize','standardize'
+        """
+    def __init__(self,alpha=0.01,degree_accuracy=0.05,feature_scaling=None):
+        self.alpha = alpha
+        self.degree_accuracy=degree_accuracy
+        self.feature_scaling=feature_scaling
+    def cost_function(self,X,y,theta):
+        m,n=X.shape
+        j=(1/m)*(-np.dot(y.T,np.log(self.g(X,theta)))-np.dot((self.one-y).T,np.log(1-self.g(X,theta))))
+        return sum(j[0])
+    def gradient_descent(self,alpha,theta,X,y):
+        m,n=X.shape
+        theta=theta-(self.alpha/m)*np.dot(X.T,self.g(X,theta)-y)
+        return theta
+    def g(self,X,theta):
+        return 1/(1+np.power(self.test_e,-np.dot(X,theta)))
+    def fit(self,X,y,max_iterations=500):
+        """fits model
+        Parameters
+        --------------
+        X : numpy array
+            Array should be independent variables.
+            Shape must be m * n, where m is cases
+            and n is features
+        y : numpy array
+            Array should be dependent variable
+            Shape should be m * 1, where m is cases
+        max_iterations : integer, defaut 500
+            Can amend the maximum iterations of 
+            gradient descent before model finishes
+        """
+        if self.feature_scaling=='normalize':
+            X=normalize(X)
+        elif self.feature_scaling=='standardize':
+            X=standardize(X)
+        self.X=X
+        self.y=y
+        m,n=X.shape
+        iteration=0
+        self.theta = np.random.rand(n,1)
+        self.test_e=np.zeros((m,1))
+        self.test_e+=np.exp(1)
+        self.one=np.ones((m,1))
+        while not(np.absolute(self.cost_function(X,y,self.theta))<=self.degree_accuracy or iteration>=max_iterations):
+            self.theta = self.gradient_descent(self.alpha,self.theta,X,y)
+            iteration+=1
+        if iteration>=max_iterations:
+            pass
+            print('Iterations exceeded. Model may return incorrect values')
+        else:
+            pass
+            print('Model fit.')
+    def coef(self):
+        print(self.theta)
+    def predict(self,X):
+        """Predicts outcomes based on fitted model
+        Parameters
+        --------------
+        X : numpy array
+            inputs in shape m x n,
+            where m is sample cases and
+            n is features
+        Returns 
+        --------------
+        prediction : numpy array
+            This is the list of predicted
+            outcomes based on fitted model
+        """
+        if self.feature_scaling=='normalize':
+            X=normalize(X)
+        elif self.feature_scaling=='standardize':
+            X=standardize(X)
+        prediction = self.g(X,self.theta)
+        prediction[prediction<0.5]=0
+        prediction[prediction>0.5]=1
+        return prediction
+    def accuracy(self):
+        pred=self.predict(self.X)
+        accu = y[y==pred].shape[0]/y.shape[0]
+        print('Accuracy: {0}'.format(accu))
+        return accu
