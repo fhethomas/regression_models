@@ -8,6 +8,7 @@
 # 3. Neural_network - simple perceptron to be built as class
 
 import numpy as np
+from scipy.optimize import fmin_cg #fmin_cg to train neural network
 
 """
  feature scaling
@@ -225,3 +226,142 @@ class Logistic_regression:
         accu = y[y==pred].shape[0]/y.shape[0]
         print('Accuracy: {0}'.format(accu))
         return accu
+
+class Neural_network:
+    """Neural network object. This is a simple
+    perceptron with only one hidden layer
+    Parameters
+    --------------
+    hidden_layer_size : integer, default 20
+        This is the size of the hidden layer
+    epsilon : float, default 0.12
+        float used in random number generation
+        to decide start point for coefficients
+    lamb : float, default 1
+        lambda used for regularization of
+        gradient descent
+    feature_scaling : string, default None
+        options: None, 'normalize','standardize'
+    """
+    def __init__(self,hidden_layer_size=20,epsilon=0.12,lamb=1,feature_scaling=None):
+        self.hidden_layer_size=hidden_layer_size
+        self.epsilon=epsilon
+        self.lamb=lamb
+        self.X=np.array([[]])
+        self.y=np.array([[]])
+        self.theta=np.array([[]])
+        self.input_layer_size=5
+        self.output_layer_size=1
+        self.feature_scaling_options = [None,'normalize','standardize']
+        assert feature_scaling in self.feature_scaling_options,"no such feature scaling option"
+        self.feature_scaling=feature_scaling
+    def sigmoid(self,z):
+        return 1 / (1 + np.exp(-z))
+    def sigmoidGradient(self,z):
+        return np.multiply(self.sigmoid(z),(1-self.sigmoid(z)))
+    def initialise_thetas(self,input_layer_size,hidden_layer_size,output_layer_size):
+        # Creates initial coefficients for each node
+        theta1=np.random.rand(input_layer_size+1,hidden_layer_size)
+        theta2=np.random.rand(hidden_layer_size+1,output_layer_size)
+        theta=np.array([theta1,theta2])
+        theta=self.theta_flatten(theta)*2*self.epsilon-self.epsilon
+        return theta
+    def theta_flatten(self,theta):
+        # flattens for use in minimization
+        theta_t=theta[:]
+        theta=np.array([])
+        #fmin_cg requires a gradient to be (m,0) dimensions
+        for x in theta_t:
+            theta=np.concatenate((theta,x.flatten()),0)
+        #theta=theta.reshape(len(theta),0)
+        #print(theta.dtype)
+        return theta
+    def theta_unflatten(self,theta,input_layer_size,hidden_layer_size,output_layer_size):
+        # unflattens coefficients for general use
+        theta1=theta[:(input_layer_size+1)*hidden_layer_size].reshape((input_layer_size+1),hidden_layer_size)
+        theta2=theta[(input_layer_size+1)*hidden_layer_size:].reshape(hidden_layer_size+1,output_layer_size)
+        return theta1, theta2
+    def costFunction(self,theta,X,y,input_layer_size,hidden_layer_size,output_layer_size,lamb):
+        # Calculate the cost function
+        m,n=X.shape
+        theta1,theta2=self.theta_unflatten(theta,input_layer_size,hidden_layer_size,output_layer_size)
+        one=np.ones((m,1))
+        a1=np.concatenate((one,X),1)
+        a2=np.concatenate((one,self.sigmoid(np.dot(a1,theta1))),1)
+        sig=self.sigmoid(np.dot(a2,theta2))
+        cost=np.multiply(-y,np.log(sig))-np.multiply((1-y),np.log(1-sig))
+        theta1_bias=theta1[1:,:]
+        theta2_bias=theta2[1:,:]
+        J=(1/m)*sum(sum(cost))+(lamb/(2*m))*(sum(sum(np.square(theta1_bias)))+sum(sum(np.square(theta2_bias))))
+        return J
+    def nnGradient(self,theta,X,y,input_layer_size,hidden_layer_size,output_layer_size,lamb):
+        # calculate gradient for use in gradient descent
+        m,n=X.shape
+        theta1,theta2=self.theta_unflatten(theta,input_layer_size,hidden_layer_size,output_layer_size)
+        one=np.ones((m,1))
+        a1=np.concatenate((one,X),1)
+        a2=np.concatenate((one,self.sigmoid(np.dot(a1,theta1))),1)
+        sig=self.sigmoid(np.dot(a2,theta2))
+        d3=sig-y
+        d2=np.dot(d3,theta2.T)
+        z2=self.sigmoidGradient(np.concatenate((one,np.dot(a1,theta1)),1))
+        d2=np.multiply(d2,z2)
+        delta1=np.dot(a1.T,d2[:,1:])
+        delta2=np.dot(a2.T,d3)
+        one=np.ones((1,hidden_layer_size))
+        theta1=np.concatenate((one,theta1[1:,:]),0)
+        one=np.ones((1,output_layer_size))
+        theta2=np.concatenate((one,theta2[1:,:]),0)
+        t1_grad=(1/m)*delta1+(lamb/m)*theta1
+        t2_grad=(1/m)*delta2+(lamb/m)*theta2
+        grad=self.theta_flatten([t1_grad,t2_grad])
+        #print(grad.shape)
+        return grad
+    def predict(self,X):
+        """Predicts outcomes based on fitted model
+        Parameters
+        --------------
+        X : numpy array
+            Sample used for prediction based on trained
+            model. Dimensions must be: m x n where m 
+            is samples and n is features
+            """
+        if self.feature_scaling == 'normalize':
+            X=normalize(X)
+        elif self.feature_scaling == 'standardize':
+            X=standardize(X)
+        m,n=X.shape
+        theta1,theta2=self.theta_unflatten(self.theta,self.input_layer_size,self.hidden_layer_size,self.output_layer_size)
+        one=np.ones((m,1))
+        a1=np.concatenate((one,X),1)
+        a2=np.concatenate((one,self.sigmoid(np.dot(a1,theta1))),1)
+        sig=self.sigmoid(np.dot(a2,theta2))
+        sig[sig>0.5]=1
+        sig[sig<0.5]=0
+        #print((sig[sig==y].shape[0]/X.shape[0])/output_layer_size)
+        return sig
+    def fit(self,X,y):
+        """Fits the model to the training data
+        Parameters
+        --------------
+        X : numpy array
+            shape is m x n, where m is sample
+            and n is features
+        y : numpy array, 
+            shape must be m x u, where m is
+            samples and u is categorical features.
+            This must be an array of integers 0 or 1 
+            representing boolean data"""
+        if self.feature_scaling == 'normalize':
+            X=normalize(X)
+        elif self.feature_scaling == 'standardize':
+            X=standardize(X)
+        m,n=X.shape
+        self.input_layer_size=n
+        self.hidden_layer_size=n+1
+        m,n=y.shape
+        self.output_layer_size=n
+        self.theta=self.initialise_thetas(self.input_layer_size,self.hidden_layer_size,self.output_layer_size)
+        arg=X,y,self.input_layer_size,self.hidden_layer_size,self.output_layer_size,self.lamb
+        self.theta=fmin_cg(self.costFunction,x0=self.theta, fprime= self.nnGradient,args=arg)
+        print('Training complete')
